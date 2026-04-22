@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice AI Agent | Personal Assistant</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Voice AI <span>Agent</span></h1>
+            <p>Your task-focused assistant with memory and tools.</p>
+        </header>
+
+        <main>
+            <div class="visualizer-container">
+                <div id="visualizer" class="visualizer">
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                </div>
+                <div id="status" class="status-text">Click to start listening</div>
+            </div>
+
+            <div class="chat-display">
+                <div class="card">
+                    <h3>You said:</h3>
+                    <p id="user-transcript" class="transcript-placeholder">Waiting for voice input...</p>
+                </div>
+                <div class="card ai-card">
+                    <h3>AI Response:</h3>
+                    <p id="ai-response" class="transcript-placeholder">Hello! How can I help you today?</p>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button id="listen-btn" class="btn btn-primary">
+                    <span class="icon">🎙️</span>
+                    <span id="btn-text">Start Listening</span>
+                </button>
+            </div>
+        </main>
+
+        <footer>
+            <p>Powered by OpenAI & Web Speech API</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
