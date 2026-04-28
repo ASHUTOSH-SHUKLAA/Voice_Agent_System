@@ -1,99 +1,118 @@
 /**
  * todo.js - Todo CRUD operations + Express routes
- * Stores tasks in todos.json as: [{ id, title }]
+ * Stores tasks in Redis as JSON under a single key
  */
 
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const { getRedisClient } = require('../lib/redis');
 
 const router = express.Router();
-const TODO_FILE = path.join(__dirname, '..', 'data', 'todos.json');
+const TODO_KEY = `${process.env.REDIS_KEY_PREFIX || 'voice-agent'}:todos`;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Read todos from file; returns [] if file doesn't exist */
-function readTodos() {
-  if (!fs.existsSync(TODO_FILE)) return [];
-  const raw = fs.readFileSync(TODO_FILE, 'utf-8');
-  return JSON.parse(raw || '[]');
+async function readTodos() {
+  const raw = await getRedisClient().get(TODO_KEY);
+  return raw ? JSON.parse(raw) : [];
 }
 
-/** Write todos array back to file */
-function writeTodos(todos) {
-  fs.mkdirSync(path.dirname(TODO_FILE), { recursive: true });
-  fs.writeFileSync(TODO_FILE, JSON.stringify(todos, null, 2));
+async function writeTodos(todos) {
+  await getRedisClient().set(TODO_KEY, JSON.stringify(todos));
 }
 
-/** Generate next unique numeric ID */
 function nextId(todos) {
-  return todos.length === 0 ? 1 : Math.max(...todos.map(t => t.id)) + 1;
+  return todos.length === 0 ? 1 : Math.max(...todos.map((task) => task.id)) + 1;
 }
 
-// ─── Core Functions (called by agent) ────────────────────────────────────────
-
-function addTask(title) {
-  const todos = readTodos();
+async function addTask(title) {
+  const todos = await readTodos();
   const newTask = { id: nextId(todos), title: title.trim() };
   todos.push(newTask);
-  writeTodos(todos);
+  await writeTodos(todos);
   return newTask;
 }
 
-function updateTask(id, newTitle) {
-  const todos = readTodos();
-  const task = todos.find(t => t.id === Number(id));
+async function updateTask(id, newTitle) {
+  const todos = await readTodos();
+  const task = todos.find((todo) => todo.id === Number(id));
+
   if (!task) return null;
+
   task.title = newTitle.trim();
-  writeTodos(todos);
+  await writeTodos(todos);
   return task;
 }
 
-function deleteTask(id) {
-  const todos = readTodos();
-  const index = todos.findIndex(t => t.id === Number(id));
+async function deleteTask(id) {
+  const todos = await readTodos();
+  const index = todos.findIndex((todo) => todo.id === Number(id));
+
   if (index === -1) return null;
+
   const [removed] = todos.splice(index, 1);
-  writeTodos(todos);
+  await writeTodos(todos);
   return removed;
 }
 
-function listTasks() {
+async function listTasks() {
   return readTodos();
 }
 
-// ─── Express Routes ───────────────────────────────────────────────────────────
+router.post('/add', async (req, res, next) => {
+  try {
+    const { title } = req.body;
+    if (typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ error: 'title is required' });
+    }
 
-// POST /tool/add  → { title }
-router.post('/add', (req, res) => {
-  const { title } = req.body;
-  if (!title) return res.status(400).json({ error: 'title is required' });
-  const task = addTask(title);
-  res.json({ success: true, task });
+    const task = await addTask(title);
+    return res.json({ success: true, task });
+  } catch (error) {
+    return next(error);
+  }
 });
 
-// POST /tool/update  → { id, newTitle }
-router.post('/update', (req, res) => {
-  const { id, newTitle } = req.body;
-  if (!id || !newTitle) return res.status(400).json({ error: 'id and newTitle are required' });
-  const task = updateTask(id, newTitle);
-  if (!task) return res.status(404).json({ error: `Task with id ${id} not found` });
-  res.json({ success: true, task });
+router.post('/update', async (req, res, next) => {
+  try {
+    const { id, newTitle } = req.body;
+    if (!id || typeof newTitle !== 'string' || !newTitle.trim()) {
+      return res.status(400).json({ error: 'id and newTitle are required' });
+    }
+
+    const task = await updateTask(id, newTitle);
+    if (!task) {
+      return res.status(404).json({ error: `Task with id ${id} not found` });
+    }
+
+    return res.json({ success: true, task });
+  } catch (error) {
+    return next(error);
+  }
 });
 
-// POST /tool/delete  → { id }
-router.post('/delete', (req, res) => {
-  const { id } = req.body;
-  if (!id) return res.status(400).json({ error: 'id is required' });
-  const task = deleteTask(id);
-  if (!task) return res.status(404).json({ error: `Task with id ${id} not found` });
-  res.json({ success: true, removed: task });
+router.post('/delete', async (req, res, next) => {
+  try {
+    const { id } = req.body;
+    if (!id) {
+      return res.status(400).json({ error: 'id is required' });
+    }
+
+    const task = await deleteTask(id);
+    if (!task) {
+      return res.status(404).json({ error: `Task with id ${id} not found` });
+    }
+
+    return res.json({ success: true, removed: task });
+  } catch (error) {
+    return next(error);
+  }
 });
 
-// GET /tool/list
-router.get('/list', (req, res) => {
-  const tasks = listTasks();
-  res.json({ success: true, tasks });
+router.get('/list', async (req, res, next) => {
+  try {
+    const tasks = await listTasks();
+    return res.json({ success: true, tasks });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 module.exports = router;

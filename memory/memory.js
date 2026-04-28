@@ -1,66 +1,63 @@
 /**
  * memory.js - User memory storage + Express routes
- * Stores memory entries in memory.json as: [{ id, text, timestamp }]
+ * Stores memory entries in Redis as JSON under a single key
  */
 
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const { getRedisClient } = require('../lib/redis');
 
 const router = express.Router();
-const MEMORY_FILE = path.join(__dirname, '..', 'data', 'memory.json');
+const MEMORY_KEY = `${process.env.REDIS_KEY_PREFIX || 'voice-agent'}:memory`;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Read memory entries from file */
-function readMemory() {
-  if (!fs.existsSync(MEMORY_FILE)) return [];
-  const raw = fs.readFileSync(MEMORY_FILE, 'utf-8');
-  return JSON.parse(raw || '[]');
+async function readMemory() {
+  const raw = await getRedisClient().get(MEMORY_KEY);
+  return raw ? JSON.parse(raw) : [];
 }
 
-/** Write memory entries back to file */
-function writeMemory(entries) {
-  fs.mkdirSync(path.dirname(MEMORY_FILE), { recursive: true });
-  fs.writeFileSync(MEMORY_FILE, JSON.stringify(entries, null, 2));
+async function writeMemory(entries) {
+  await getRedisClient().set(MEMORY_KEY, JSON.stringify(entries));
 }
 
-// ─── Core Functions (called by agent) ────────────────────────────────────────
-
-/** Save a new memory entry */
-function saveMemory(text) {
-  const entries = readMemory();
+async function saveMemory(text) {
+  const entries = await readMemory();
   const entry = {
     id: entries.length + 1,
     text: text.trim(),
     timestamp: new Date().toISOString(),
   };
+
   entries.push(entry);
-  writeMemory(entries);
+  await writeMemory(entries);
   return entry;
 }
 
-/** Get all memory entries as a formatted string */
-function getMemory() {
-  const entries = readMemory();
+async function getMemory() {
+  const entries = await readMemory();
   if (entries.length === 0) return 'No memories stored yet.';
-  return entries.map(e => `[${e.timestamp.slice(0, 10)}] ${e.text}`).join('\n');
+  return entries.map((entry) => `[${entry.timestamp.slice(0, 10)}] ${entry.text}`).join('\n');
 }
 
-// ─── Express Routes ───────────────────────────────────────────────────────────
+router.post('/save', async (req, res, next) => {
+  try {
+    const { text } = req.body;
+    if (typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ error: 'text is required' });
+    }
 
-// POST /memory/save  → { text }
-router.post('/save', (req, res) => {
-  const { text } = req.body;
-  if (!text) return res.status(400).json({ error: 'text is required' });
-  const entry = saveMemory(text);
-  res.json({ success: true, entry });
+    const entry = await saveMemory(text);
+    return res.json({ success: true, entry });
+  } catch (error) {
+    return next(error);
+  }
 });
 
-// GET /memory/get
-router.get('/get', (req, res) => {
-  const memory = getMemory();
-  res.json({ success: true, memory });
+router.get('/get', async (req, res, next) => {
+  try {
+    const memory = await getMemory();
+    return res.json({ success: true, memory });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 module.exports = router;

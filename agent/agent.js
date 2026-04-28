@@ -1,5 +1,5 @@
 /**
- * agent.js - AI Agent logic using OpenAI Function Calling
+ * agent.js - AI Agent logic using Groq tool calling
  */
 
 const express = require('express');
@@ -13,146 +13,150 @@ require('dotenv').config();
 const router = express.Router();
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// ─── Tool Definitions ────────────────────────────────────────────────────────
+function parseToolArguments(rawArguments) {
+  try {
+    return rawArguments ? JSON.parse(rawArguments) : {};
+  } catch (error) {
+    throw new Error(`Invalid tool arguments: ${error.message}`);
+  }
+}
 
 const tools = [
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "addTask",
-      description: "Adds a new task to the todo list",
+      name: 'addTask',
+      description: 'Adds a new task to the todo list',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          title: { type: "string", description: "The title of the task" }
+          title: { type: 'string', description: 'The title of the task' },
         },
-        required: ["title"]
-      }
-    }
+        required: ['title'],
+      },
+    },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "updateTask",
-      description: "Updates an existing task title by ID",
+      name: 'updateTask',
+      description: 'Updates an existing task title by ID',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          id: { type: "number", description: "The unique ID of the task" },
-          newTitle: { type: "string", description: "The new title for the task" }
+          id: { type: 'number', description: 'The unique ID of the task' },
+          newTitle: { type: 'string', description: 'The new title for the task' },
         },
-        required: ["id", "newTitle"]
-      }
-    }
+        required: ['id', 'newTitle'],
+      },
+    },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "deleteTask",
-      description: "Deletes a task by ID",
+      name: 'deleteTask',
+      description: 'Deletes a task by ID',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          id: { type: "number", description: "The unique ID of the task to delete" }
+          id: { type: 'number', description: 'The unique ID of the task to delete' },
         },
-        required: ["id"]
-      }
-    }
+        required: ['id'],
+      },
+    },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "listTasks",
-      description: "Lists all current tasks in the todo list",
-      parameters: { type: "object", properties: {} }
-    }
+      name: 'listTasks',
+      description: 'Lists all current tasks in the todo list',
+      parameters: { type: 'object', properties: {} },
+    },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "saveMemory",
-      description: "Saves important personal user information to memory",
+      name: 'saveMemory',
+      description: 'Saves important personal user information to memory',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          text: { type: "string", description: "The information to remember" }
+          text: { type: 'string', description: 'The information to remember' },
         },
-        required: ["text"]
-      }
-    }
+        required: ['text'],
+      },
+    },
   },
   {
-    type: "function",
+    type: 'function',
     function: {
-      name: "getMemory",
-      description: "Retrieves all stored personal user information from memory",
-      parameters: { type: "object", properties: {} }
-    }
-  }
+      name: 'getMemory',
+      description: 'Retrieves all stored personal user information from memory',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
 ];
-
-// ─── Agent Logic ─────────────────────────────────────────────────────────────
 
 async function callAgent(userInput) {
   try {
-    let messages = [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: userInput }
+    const messages = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: userInput },
     ];
 
     const response = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile", 
-      messages: messages,
-      tools: tools,
-      tool_choice: "auto",
+      model: 'llama-3.3-70b-versatile',
+      messages,
+      tools,
+      tool_choice: 'auto',
     });
 
     const responseMessage = response.choices[0].message;
 
-    // Handle tool calls
     if (responseMessage.tool_calls) {
       messages.push(responseMessage);
 
       for (const toolCall of responseMessage.tool_calls) {
         const functionName = toolCall.function.name;
-        const functionArgs = JSON.parse(toolCall.function.arguments);
+        const functionArgs = parseToolArguments(toolCall.function.arguments);
         let functionResult;
 
         console.log(`[Agent] Calling tool: ${functionName}`, functionArgs);
 
         switch (functionName) {
           case 'addTask':
-            functionResult = addTask(functionArgs.title);
+            functionResult = await addTask(functionArgs.title);
             break;
           case 'updateTask':
-            functionResult = updateTask(functionArgs.id, functionArgs.newTitle);
+            functionResult = await updateTask(functionArgs.id, functionArgs.newTitle);
             break;
           case 'deleteTask':
-            functionResult = deleteTask(functionArgs.id);
+            functionResult = await deleteTask(functionArgs.id);
             break;
           case 'listTasks':
-            functionResult = listTasks();
+            functionResult = await listTasks();
             break;
           case 'saveMemory':
-            functionResult = saveMemory(functionArgs.text);
+            functionResult = await saveMemory(functionArgs.text);
             break;
           case 'getMemory':
-            functionResult = getMemory();
+            functionResult = await getMemory();
             break;
+          default:
+            throw new Error(`Unsupported tool call: ${functionName}`);
         }
 
         messages.push({
           tool_call_id: toolCall.id,
-          role: "tool",
+          role: 'tool',
           name: functionName,
           content: JSON.stringify(functionResult),
         });
       }
 
-      // Get final response from AI after tool results
       const finalResponse = await groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
-        messages: messages,
+        model: 'llama-3.3-70b-versatile',
+        messages,
       });
 
       return finalResponse.choices[0].message.content;
@@ -165,14 +169,14 @@ async function callAgent(userInput) {
   }
 }
 
-// ─── Route ───────────────────────────────────────────────────────────────────
-
 router.post('/', async (req, res) => {
   const { text } = req.body;
-  if (!text) return res.status(400).json({ error: 'text is required' });
+  if (typeof text !== 'string' || !text.trim()) {
+    return res.status(400).json({ error: 'text is required' });
+  }
 
-  const response = await callAgent(text);
-  res.json({ response });
+  const response = await callAgent(text.trim());
+  return res.json({ response });
 });
 
 module.exports = router;
