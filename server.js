@@ -9,9 +9,13 @@ const cors = require('cors');
 const path = require('path');
 
 const { connectRedis, closeRedis } = require('./lib/redis');
+const { getJwtSecret } = require('./middleware/auth');
+const authRoute = require('./auth/auth');
+const { requireAuth } = require('./middleware/auth');
 const agentRoute = require('./agent/agent');
 const todoRoute = require('./tools/todo');
 const memoryRoute = require('./memory/memory');
+const speechRoute = require('./speech/transcribe');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,12 +37,22 @@ app.use(cors({ origin: corsOrigin }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use('/agent', agentRoute);
-app.use('/tool', todoRoute);
-app.use('/memory', memoryRoute);
+app.use('/auth', authRoute);
+app.use('/agent', requireAuth, agentRoute);
+app.use('/tool', requireAuth, todoRoute);
+app.use('/memory', requireAuth, memoryRoute);
+app.use('/speech', requireAuth, speechRoute);
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.get('/signup', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'signup.html'));
 });
 
 app.get('/health', (req, res) => {
@@ -62,6 +76,7 @@ app.use((err, req, res, next) => {
 });
 
 async function startServer() {
+  getJwtSecret();
   await connectRedis();
 
   app.listen(PORT, () => {

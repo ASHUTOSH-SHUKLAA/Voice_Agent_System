@@ -3,53 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice AI Agent | Personal Assistant</title>
+    <title>Voice AI Agent | Assistant</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Voice AI <span>Agent</span></h1>
-            <p>Your task-focused assistant with memory and tools.</p>
-        </header>
+    <div class="page-shell">
+        <div class="aurora aurora-one"></div>
+        <div class="aurora aurora-two"></div>
 
-        <main>
-            <div class="visualizer-container">
-                <div id="visualizer" class="visualizer">
-                    <div class="bar"></div>
-                    <div class="bar"></div>
-                    <div class="bar"></div>
-                    <div class="bar"></div>
-                    <div class="bar"></div>
+        <div class="container">
+            <header class="hero">
+                <div>
+                    <p class="eyebrow">Secure Voice Workspace</p>
+                    <h1>Voice AI <span>Agent</span></h1>
+                    <p class="hero-copy">A JWT-protected assistant for tasks, memory, and voice-first workflows.</p>
                 </div>
-                <div id="status" class="status-text">Click to start listening</div>
-            </div>
-
-            <div class="chat-display">
-                <div class="card">
-                    <h3>You said:</h3>
-                    <p id="user-transcript" class="transcript-placeholder">Waiting for voice input...</p>
+                <div id="session-panel" class="session-panel">
+                    <button id="logout-btn" class="btn btn-secondary" type="button">Logout</button>
                 </div>
-                <div class="card ai-card">
-                    <h3>AI Response:</h3>
-                    <p id="ai-response" class="transcript-placeholder">Hello! How can I help you today?</p>
+            </header>
+
+            <main class="assistant-card">
+                <div class="visualizer-container">
+                    <div id="visualizer" class="visualizer">
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                    </div>
+                    <div id="status" class="status-text">Preparing your workspace...</div>
                 </div>
-            </div>
 
-            <div class="controls">
-                <button id="listen-btn" class="btn btn-primary">
-                    <span class="icon">🎙️</span>
-                    <span id="btn-text">Start Listening</span>
-                </button>
-            </div>
-        </main>
+                <div class="chat-display">
+                    <div class="card">
+                        <h3>You said</h3>
+                        <p id="user-transcript" class="transcript-placeholder">Waiting for voice input...</p>
+                    </div>
+                    <div class="card ai-card">
+                        <h3>AI Response</h3>
+                        <p id="ai-response" class="transcript-placeholder">Once your session is verified, I am ready to help.</p>
+                    </div>
+                </div>
 
-        <footer>
-            <p>Powered by OpenAI & Web Speech API</p>
-        </footer>
+                <form id="text-form" class="text-form">
+                    <label class="text-label" for="text-input">Type a message if voice recognition is unavailable</label>
+                    <div class="text-row">
+                        <input id="text-input" class="text-input" type="text" placeholder="Type your request here" maxlength="500">
+                        <button id="send-btn" class="btn btn-secondary" type="submit">Send</button>
+                    </div>
+                </form>
+
+                <div class="controls">
+                    <button id="listen-btn" class="btn btn-primary" type="button" disabled>
+                        <span class="icon">🎙️</span>
+                        <span id="btn-text">Start Recording</span>
+                    </button>
+                </div>
+            </main>
+
+            <footer>
+                <p>Powered by Groq, Redis, JWT, and the Web Speech API</p>
+            </footer>
+        </div>
     </div>
 
     <script src="script.js"></script>

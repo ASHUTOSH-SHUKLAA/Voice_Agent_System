@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Voice AI Agent</title>
+    <link rel="stylesheet" href="auth.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body data-auth-mode="login">
+    <main class="auth-shell">
+        <section class="auth-card">
+            <p class="eyebrow">Voice Agent Access</p>
+            <h1>Welcome back</h1>
+            <p class="subtitle">Log in to continue to your voice workspace.</p>
+
+            <form id="auth-form" class="auth-form">
+                <label class="field">
+                    <span>Email</span>
+                    <input id="email" name="email" type="email" autocomplete="email" required>
+                </label>
+
+                <label class="field">
+                    <span>Password</span>
+                    <input id="password" name="password" type="password" autocomplete="current-password" required>
+                </label>
+
+                <button id="submit-btn" class="btn" type="submit">Login</button>
+            </form>
+
+            <p id="auth-status" class="auth-status">Use your email and password to sign in.</p>
+            <p class="auth-link">Need an account? <a href="/signup">Create one</a></p>
+        </section>
+    </main>
+
+    <script src="auth-pages.js"></script>
+</body>
+</html>

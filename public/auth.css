@@ -1,0 +1,118 @@
+:root {
+    --ink: #10212b;
+    --paper: #fffaf0;
+    --teal: #0f766e;
+    --coral: #f97316;
+    --line: rgba(16, 33, 43, 0.14);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Outfit', sans-serif;
+}
+
+body {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    color: var(--ink);
+    background:
+        radial-gradient(circle at top left, rgba(20, 184, 166, 0.22), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.18), transparent 32%),
+        linear-gradient(135deg, #f8f4ea 0%, #d7ebe7 100%);
+}
+
+.auth-shell {
+    width: min(100%, 440px);
+}
+
+.auth-card {
+    padding: 30px;
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    background: rgba(255, 252, 245, 0.78);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 24px 80px rgba(16, 33, 43, 0.14);
+}
+
+.eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 0.78rem;
+    color: var(--teal);
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+h1 {
+    font-size: 2.5rem;
+    line-height: 1;
+    margin-bottom: 12px;
+}
+
+.subtitle {
+    color: rgba(16, 33, 43, 0.7);
+    line-height: 1.6;
+    margin-bottom: 22px;
+}
+
+.auth-form {
+    display: grid;
+    gap: 14px;
+}
+
+.field {
+    display: grid;
+    gap: 8px;
+}
+
+.field input {
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(39, 64, 75, 0.18);
+    background: rgba(255, 255, 255, 0.72);
+    font-size: 1rem;
+}
+
+.field input:focus {
+    outline: none;
+    border-color: #14b8a6;
+    box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
+}
+
+.btn {
+    margin-top: 6px;
+    padding: 14px 18px;
+    border: none;
+    border-radius: 999px;
+    color: white;
+    background: linear-gradient(135deg, var(--teal) 0%, var(--coral) 100%);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.auth-status {
+    margin-top: 16px;
+    min-height: 24px;
+    color: rgba(16, 33, 43, 0.72);
+}
+
+.auth-link {
+    margin-top: 10px;
+    color: rgba(16, 33, 43, 0.74);
+}
+
+.auth-link a {
+    color: var(--teal);
+    font-weight: 700;
+    text-decoration: none;
+}

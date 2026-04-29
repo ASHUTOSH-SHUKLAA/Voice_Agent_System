@@ -10,6 +10,5 @@ yarn-debug.log*
 yarn-error.log*
 dist/
 build/
-README.md
 DEPLOY.md
 push_to_github.bat

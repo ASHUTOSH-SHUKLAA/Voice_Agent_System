@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up | Voice AI Agent</title>
+    <link rel="stylesheet" href="auth.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body data-auth-mode="signup">
+    <main class="auth-shell">
+        <section class="auth-card">
+            <p class="eyebrow">Create Your Workspace</p>
+            <h1>Sign up</h1>
+            <p class="subtitle">Create an account to access your own tasks, memory, and voice history.</p>
+
+            <form id="auth-form" class="auth-form">
+                <label class="field">
+                    <span>Email</span>
+                    <input id="email" name="email" type="email" autocomplete="email" required>
+                </label>
+
+                <label class="field">
+                    <span>Password</span>
+                    <input id="password" name="password" type="password" autocomplete="new-password" required>
+                </label>
+
+                <label class="field">
+                    <span>Confirm Password</span>
+                    <input id="confirm-password" name="confirmPassword" type="password" autocomplete="new-password" required>
+                </label>
+
+                <button id="submit-btn" class="btn" type="submit">Create Account</button>
+            </form>
+
+            <p id="auth-status" class="auth-status">Use a valid email and a password with at least 6 characters.</p>
+            <p class="auth-link">Already have an account? <a href="/login">Log in</a></p>
+        </section>
+    </main>
+
+    <script src="auth-pages.js"></script>
+</body>
+</html>

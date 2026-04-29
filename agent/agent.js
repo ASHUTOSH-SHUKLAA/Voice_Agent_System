@@ -97,7 +97,7 @@ const tools = [
   },
 ];
 
-async function callAgent(userInput) {
+async function callAgent(email, userInput) {
   try {
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -125,22 +125,22 @@ async function callAgent(userInput) {
 
         switch (functionName) {
           case 'addTask':
-            functionResult = await addTask(functionArgs.title);
+            functionResult = await addTask(email, functionArgs.title);
             break;
           case 'updateTask':
-            functionResult = await updateTask(functionArgs.id, functionArgs.newTitle);
+            functionResult = await updateTask(email, functionArgs.id, functionArgs.newTitle);
             break;
           case 'deleteTask':
-            functionResult = await deleteTask(functionArgs.id);
+            functionResult = await deleteTask(email, functionArgs.id);
             break;
           case 'listTasks':
-            functionResult = await listTasks();
+            functionResult = await listTasks(email);
             break;
           case 'saveMemory':
-            functionResult = await saveMemory(functionArgs.text);
+            functionResult = await saveMemory(email, functionArgs.text);
             break;
           case 'getMemory':
-            functionResult = await getMemory();
+            functionResult = await getMemory(email);
             break;
           default:
             throw new Error(`Unsupported tool call: ${functionName}`);
@@ -175,7 +175,7 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'text is required' });
   }
 
-  const response = await callAgent(text.trim());
+  const response = await callAgent(req.user.email, text.trim());
   return res.json({ response });
 });
 
