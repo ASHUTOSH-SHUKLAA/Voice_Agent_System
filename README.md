@@ -2,6 +2,9 @@
 
 This is a full-stack Voice AI Agent built with Node.js, Express, Groq, Redis, and JWT-based authentication. Users can sign up with email, log in, and access their own private task and memory data.
 
+## Deployed Version
+https://voice-agent-system.onrender.com/
+
 ## Features
 
 - Separate signup and login pages with email-based authentication
