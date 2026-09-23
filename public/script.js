@@ -16,6 +16,9 @@ const statusText = document.getElementById('status');
 const visualizer = document.getElementById('visualizer');
 const userTranscriptDisplay = document.getElementById('user-transcript');
 const aiResponseDisplay = document.getElementById('ai-response');
+const tasksList = document.getElementById('tasks-list');
+const tasksCount = document.getElementById('tasks-count');
+const refreshTasksBtn = document.getElementById('refresh-tasks-btn');
 
 let mediaRecorder;
 let mediaStream;
@@ -60,7 +63,16 @@ async function apiFetch(url, options = {}) {
         headers.Authorization = `Bearer ${authToken}`;
     }
 
-    const response = await fetch(url, { ...options, headers });
+    let response;
+    try {
+        response = await fetch(url, { ...options, headers });
+    } catch (error) {
+        const hint = window.location.origin.includes('localhost')
+            ? 'Make sure the Express server is still running on this same localhost port, then hard refresh the page.'
+            : 'This usually means the deployed server was unreachable or blocked before it could answer.';
+        throw new Error(`Network request failed. ${hint}`);
+    }
+
     if (response.status === 401) {
         clearSession();
         redirectToLogin();
@@ -85,6 +97,7 @@ async function restoreSession() {
         listenBtn.title = '';
         aiResponseDisplay.textContent = 'Session verified. Ask me anything.';
         await ensureRecorderReady();
+        await loadTasks();
         setIdleStatus();
         return true;
     } catch (error) {
@@ -237,10 +250,11 @@ async function processUserInput(text) {
 
         aiResponseDisplay.textContent = aiText;
         speak(aiText);
+        await loadTasks();
     } catch (error) {
         console.error('API Error:', error);
         if (error.message !== 'Unauthorized') {
-            aiResponseDisplay.textContent = "Error: Couldn't connect to server.";
+            aiResponseDisplay.textContent = error.message || "Error: Couldn't connect to server.";
             speak("I'm sorry, I'm having trouble connecting to the server.");
         }
     } finally {
@@ -248,6 +262,67 @@ async function processUserInput(text) {
         listenBtn.disabled = !authToken || !voiceInputAvailable;
         setIdleStatus();
     }
+}
+
+function escapeHtml(str) {
+    return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+async function loadTasks() {
+    if (!authToken || !tasksList) return;
+    try {
+        const response = await apiFetch('/tool/list', { method: 'GET' });
+        if (!response.ok) return;
+        const data = await response.json();
+        const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+
+        if (tasksCount) {
+            tasksCount.textContent = tasks.length;
+        }
+
+        if (tasks.length === 0) {
+            tasksList.innerHTML = '<li class="tasks-empty">No tasks yet. Say "Add Buy groceries to my list" to get started!</li>';
+            return;
+        }
+
+        tasksList.innerHTML = tasks
+            .map(
+                (task) => `
+            <li class="tasks-item" data-id="${task.id}">
+                <div class="tasks-item-content">
+                    <span class="tasks-item-id">#${task.id}</span>
+                    <span class="tasks-item-title">${escapeHtml(task.title)}</span>
+                </div>
+                <button class="tasks-delete-btn" type="button" title="Delete task" onclick="deleteTaskItem(${task.id})">✕</button>
+            </li>`
+            )
+            .join('');
+    } catch (err) {
+        console.warn('Could not load tasks:', err.message);
+    }
+}
+
+window.deleteTaskItem = async function (id) {
+    if (!authToken) return;
+    try {
+        await apiFetch('/tool/delete', {
+            method: 'POST',
+            body: JSON.stringify({ id: Number(id) }),
+        });
+        await loadTasks();
+    } catch (err) {
+        console.error('Delete task failed:', err);
+    }
+};
+
+if (refreshTasksBtn) {
+    refreshTasksBtn.addEventListener('click', () => {
+        loadTasks();
+    });
 }
 
 function speak(text) {
@@ -271,3 +346,4 @@ window.speechSynthesis.onvoiceschanged = () => {
 };
 
 restoreSession();
+

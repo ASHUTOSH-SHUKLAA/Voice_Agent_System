@@ -10,44 +10,77 @@ const router = express.Router();
 const TODO_KEY_PREFIX = `${process.env.REDIS_KEY_PREFIX || 'voice-agent'}:todos`;
 
 function todoKey(email) {
-  return `${TODO_KEY_PREFIX}:${String(email).toLowerCase()}`;
+  return `${TODO_KEY_PREFIX}:${String(email || 'default').toLowerCase()}`;
+}
+
+function sanitizeTitle(rawTitle) {
+  if (typeof rawTitle === 'string') {
+    return rawTitle.trim();
+  }
+  if (rawTitle && typeof rawTitle === 'object') {
+    const val = rawTitle.title || rawTitle.task || rawTitle.todo || rawTitle.text || rawTitle.content || rawTitle.name;
+    return typeof val === 'string' ? val.trim() : String(val || '').trim();
+  }
+  return String(rawTitle || '').trim();
 }
 
 async function readTodos(email) {
-  const raw = await getRedisClient().get(todoKey(email));
-  return raw ? JSON.parse(raw) : [];
+  try {
+    const raw = await getRedisClient().get(todoKey(email));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error('[Todo Error] readTodos failed:', error.message);
+    return [];
+  }
 }
 
 async function writeTodos(email, todos) {
-  await getRedisClient().set(todoKey(email), JSON.stringify(todos));
+  try {
+    const safeTodos = Array.isArray(todos) ? todos : [];
+    await getRedisClient().set(todoKey(email), JSON.stringify(safeTodos));
+  } catch (error) {
+    console.error('[Todo Error] writeTodos failed:', error.message);
+  }
 }
 
 function nextId(todos) {
-  return todos.length === 0 ? 1 : Math.max(...todos.map((task) => task.id)) + 1;
+  if (!Array.isArray(todos) || todos.length === 0) return 1;
+  const validIds = todos
+    .map((task) => Number(task && task.id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+  return validIds.length === 0 ? 1 : Math.max(...validIds) + 1;
 }
 
-async function addTask(email, title) {
+async function addTask(email, rawTitle) {
   const todos = await readTodos(email);
-  const newTask = { id: nextId(todos), title: title.trim() };
+  const cleanTitle = sanitizeTitle(rawTitle) || 'New task';
+  const newTask = { id: nextId(todos), title: cleanTitle };
   todos.push(newTask);
   await writeTodos(email, todos);
   return newTask;
 }
 
-async function updateTask(email, id, newTitle) {
+async function updateTask(email, id, rawNewTitle) {
   const todos = await readTodos(email);
-  const task = todos.find((todo) => todo.id === Number(id));
+  const numericId = Number(id);
+  const task = todos.find((todo) => Number(todo && todo.id) === numericId);
 
   if (!task) return null;
 
-  task.title = newTitle.trim();
+  const cleanTitle = sanitizeTitle(rawNewTitle);
+  if (cleanTitle) {
+    task.title = cleanTitle;
+  }
   await writeTodos(email, todos);
   return task;
 }
 
 async function deleteTask(email, id) {
   const todos = await readTodos(email);
-  const index = todos.findIndex((todo) => todo.id === Number(id));
+  const numericId = Number(id);
+  const index = todos.findIndex((todo) => Number(todo && todo.id) === numericId);
 
   if (index === -1) return null;
 

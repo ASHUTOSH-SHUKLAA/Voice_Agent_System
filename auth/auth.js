@@ -27,8 +27,13 @@ function validateCredentials(email, password) {
 }
 
 async function getUserByEmail(email) {
-  const raw = await getRedisClient().get(userKey(email));
-  return raw ? JSON.parse(raw) : null;
+  try {
+    const raw = await getRedisClient().get(userKey(email));
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    console.error('[Auth Error] getUserByEmail failed:', error.message);
+    return null;
+  }
 }
 
 async function createUser(email, password) {

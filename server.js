@@ -59,6 +59,17 @@ app.get('/health', (req, res) => {
   res.json({ ok: true, service: 'voice-agent-system' });
 });
 
+app.get('/models', async (req, res) => {
+  try {
+    const Groq = require('groq-sdk');
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    const list = await groq.models.list();
+    return res.json({ models: list.data.map((m) => m.id) });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     return res.status(400).json({ error: 'Invalid JSON request body' });

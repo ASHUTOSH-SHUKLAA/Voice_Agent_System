@@ -10,23 +10,47 @@ const router = express.Router();
 const MEMORY_KEY_PREFIX = `${process.env.REDIS_KEY_PREFIX || 'voice-agent'}:memory`;
 
 function memoryKey(email) {
-  return `${MEMORY_KEY_PREFIX}:${String(email).toLowerCase()}`;
+  return `${MEMORY_KEY_PREFIX}:${String(email || 'default').toLowerCase()}`;
+}
+
+function sanitizeMemoryText(raw) {
+  if (typeof raw === 'string') return raw.trim();
+  if (raw && typeof raw === 'object') {
+    const val = raw.text || raw.memory || raw.info || raw.content || raw.data;
+    return typeof val === 'string' ? val.trim() : String(val || '').trim();
+  }
+  return String(raw || '').trim();
 }
 
 async function readMemory(email) {
-  const raw = await getRedisClient().get(memoryKey(email));
-  return raw ? JSON.parse(raw) : [];
+  try {
+    const raw = await getRedisClient().get(memoryKey(email));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error('[Memory Error] readMemory failed:', error.message);
+    return [];
+  }
 }
 
 async function writeMemory(email, entries) {
-  await getRedisClient().set(memoryKey(email), JSON.stringify(entries));
+  try {
+    const safeEntries = Array.isArray(entries) ? entries : [];
+    await getRedisClient().set(memoryKey(email), JSON.stringify(safeEntries));
+  } catch (error) {
+    console.error('[Memory Error] writeMemory failed:', error.message);
+  }
 }
 
-async function saveMemory(email, text) {
+async function saveMemory(email, rawText) {
   const entries = await readMemory(email);
+  const cleanText = sanitizeMemoryText(rawText);
+  if (!cleanText) return null;
+
   const entry = {
     id: entries.length + 1,
-    text: text.trim(),
+    text: cleanText,
     timestamp: new Date().toISOString(),
   };
 
@@ -37,8 +61,11 @@ async function saveMemory(email, text) {
 
 async function getMemory(email) {
   const entries = await readMemory(email);
-  if (entries.length === 0) return 'No memories stored yet.';
-  return entries.map((entry) => `[${entry.timestamp.slice(0, 10)}] ${entry.text}`).join('\n');
+  if (!Array.isArray(entries) || entries.length === 0) return 'No memories stored yet.';
+  return entries
+    .filter((entry) => entry && entry.text)
+    .map((entry) => `[${(entry.timestamp || new Date().toISOString()).slice(0, 10)}] ${entry.text}`)
+    .join('\n');
 }
 
 router.post('/save', async (req, res, next) => {

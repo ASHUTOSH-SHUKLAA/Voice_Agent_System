@@ -14,10 +14,13 @@ const router = express.Router();
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 function parseToolArguments(rawArguments) {
+  if (!rawArguments) return {};
+  if (typeof rawArguments === 'object') return rawArguments;
   try {
-    return rawArguments ? JSON.parse(rawArguments) : {};
+    return JSON.parse(rawArguments);
   } catch (error) {
-    throw new Error(`Invalid tool arguments: ${error.message}`);
+    console.warn('[Agent] Could not parse tool arguments:', rawArguments);
+    return {};
   }
 }
 
@@ -30,7 +33,7 @@ const tools = [
       parameters: {
         type: 'object',
         properties: {
-          title: { type: 'string', description: 'The title of the task' },
+          title: { type: 'string', description: 'The title or description of the task to add' },
         },
         required: ['title'],
       },
@@ -97,6 +100,25 @@ const tools = [
   },
 ];
 
+const PRIMARY_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+const FALLBACK_MODEL = 'openai/gpt-oss-20b';
+
+async function callGroqWithFallback(params) {
+  try {
+    return await groq.chat.completions.create(params);
+  } catch (primaryError) {
+    console.warn(`[Groq Primary Error on ${params.model}]:`, primaryError.message);
+    if (params.model !== FALLBACK_MODEL) {
+      console.log(`[Groq] Retrying request with fallback model: ${FALLBACK_MODEL}`);
+      return await groq.chat.completions.create({
+        ...params,
+        model: FALLBACK_MODEL,
+      });
+    }
+    throw primaryError;
+  }
+}
+
 async function callAgent(email, userInput) {
   try {
     const messages = [
@@ -104,17 +126,28 @@ async function callAgent(email, userInput) {
       { role: 'user', content: userInput },
     ];
 
-    const response = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+    const response = await callGroqWithFallback({
+      model: PRIMARY_MODEL,
       messages,
       tools,
       tool_choice: 'auto',
+      temperature: 0.1,
     });
 
-    const responseMessage = response.choices[0].message;
+    const responseMessage = response.choices[0]?.message;
+    if (!responseMessage) {
+      return "I'm sorry, I couldn't generate a response. Please try again.";
+    }
 
-    if (responseMessage.tool_calls) {
-      messages.push(responseMessage);
+    if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+      messages.push({
+        role: 'assistant',
+        content: responseMessage.content || '',
+        tool_calls: responseMessage.tool_calls,
+      });
+
+      let lastAction = null;
+      let lastActionResult = null;
 
       for (const toolCall of responseMessage.tool_calls) {
         const functionName = toolCall.function.name;
@@ -122,61 +155,162 @@ async function callAgent(email, userInput) {
         let functionResult;
 
         console.log(`[Agent] Calling tool: ${functionName}`, functionArgs);
+        lastAction = functionName;
 
         switch (functionName) {
-          case 'addTask':
-            functionResult = await addTask(email, functionArgs.title);
+          case 'addTask': {
+            const rawTitle =
+              functionArgs.title ||
+              functionArgs.task ||
+              functionArgs.todo ||
+              functionArgs.text ||
+              functionArgs.content ||
+              functionArgs.name ||
+              (userInput && userInput.trim());
+            functionResult = await addTask(email, rawTitle || 'New task');
+            lastActionResult = functionResult;
             break;
-          case 'updateTask':
-            functionResult = await updateTask(email, functionArgs.id, functionArgs.newTitle);
+          }
+          case 'updateTask': {
+            const id = functionArgs.id ?? functionArgs.taskId;
+            const newTitle =
+              functionArgs.newTitle ||
+              functionArgs.title ||
+              functionArgs.task ||
+              functionArgs.text;
+            functionResult = await updateTask(email, id, newTitle || 'Updated task');
+            lastActionResult = functionResult;
             break;
-          case 'deleteTask':
-            functionResult = await deleteTask(email, functionArgs.id);
+          }
+          case 'deleteTask': {
+            const id = functionArgs.id ?? functionArgs.taskId;
+            functionResult = await deleteTask(email, id);
+            lastActionResult = functionResult;
             break;
-          case 'listTasks':
+          }
+          case 'listTasks': {
             functionResult = await listTasks(email);
+            lastActionResult = functionResult;
             break;
-          case 'saveMemory':
-            functionResult = await saveMemory(email, functionArgs.text);
+          }
+          case 'saveMemory': {
+            const text =
+              functionArgs.text ||
+              functionArgs.memory ||
+              functionArgs.info ||
+              functionArgs.content ||
+              userInput;
+            functionResult = await saveMemory(email, text || '');
+            lastActionResult = functionResult;
             break;
-          case 'getMemory':
+          }
+          case 'getMemory': {
             functionResult = await getMemory(email);
+            lastActionResult = functionResult;
             break;
+          }
           default:
-            throw new Error(`Unsupported tool call: ${functionName}`);
+            console.warn(`[Agent] Unsupported tool call: ${functionName}`);
+            functionResult = { error: `Unsupported tool call: ${functionName}` };
         }
 
         messages.push({
           tool_call_id: toolCall.id,
           role: 'tool',
           name: functionName,
-          content: JSON.stringify(functionResult),
+          content: JSON.stringify(functionResult ?? { success: true }),
         });
       }
 
-      const finalResponse = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-      });
+      let finalContent = null;
+      try {
+        const finalResponse = await callGroqWithFallback({
+          model: PRIMARY_MODEL,
+          messages,
+          tools,
+          tool_choice: 'none',
+          temperature: 0.1,
+        });
+        finalContent = finalResponse.choices[0]?.message?.content;
+      } catch (followupError) {
+        console.warn('[Agent Followup Warning]', followupError.message);
+      }
 
-      return finalResponse.choices[0].message.content;
+      if (finalContent && finalContent.trim()) {
+        return finalContent.trim();
+      }
+
+      // Safe fallback responses if LLM returns null content after tool execution
+      if (lastAction === 'addTask') {
+        const title = lastActionResult && lastActionResult.title ? lastActionResult.title : 'that task';
+        return `Done! I've added "${title}" to your todo list.`;
+      }
+      if (lastAction === 'deleteTask') {
+        return lastActionResult
+          ? `Done! I've deleted task #${lastActionResult.id} ("${lastActionResult.title}") from your list.`
+          : "Done! I've removed that task from your list.";
+      }
+      if (lastAction === 'updateTask') {
+        return lastActionResult
+          ? `Done! Task #${lastActionResult.id} has been updated to "${lastActionResult.title}".`
+          : "Done! I've updated that task.";
+      }
+      if (lastAction === 'listTasks') {
+        if (!Array.isArray(lastActionResult) || lastActionResult.length === 0) {
+          return "You don't have any tasks on your list right now.";
+        }
+        return `Here are your current tasks:\n${lastActionResult.map((t) => `• #${t.id}: ${t.title}`).join('\n')}`;
+      }
+      if (lastAction === 'saveMemory') {
+        return "I've saved that information to memory.";
+      }
+      if (lastAction === 'getMemory') {
+        return String(lastActionResult || 'No memories recorded yet.');
+      }
+
+      return "Done! I've processed your request.";
     }
 
-    return responseMessage.content;
+    return responseMessage.content || "I'm here to help. What would you like to do?";
   } catch (error) {
     console.error('[Agent Error]', error);
-    return "I'm sorry, I encountered an error while processing your request.";
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const errPayload = {
+        timestamp: new Date().toISOString(),
+        message: error.message,
+        status: error.status,
+        code: error.code,
+        error: error.error,
+        failed_generation: error.failed_generation,
+        stack: error.stack,
+      };
+      fs.writeFileSync(path.join(__dirname, '../data/last_error.log'), JSON.stringify(errPayload, null, 2));
+    } catch (logErr) {
+      console.error('[Log Error]', logErr.message);
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      return `Error: ${error.message}`;
+    }
+    return "I've encountered an issue processing that. Please try again or type your request below.";
   }
 }
 
 router.post('/', async (req, res) => {
-  const { text } = req.body;
-  if (typeof text !== 'string' || !text.trim()) {
-    return res.status(400).json({ error: 'text is required' });
-  }
+  try {
+    const { text } = req.body;
+    if (typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ error: 'text is required' });
+    }
 
-  const response = await callAgent(req.user.email, text.trim());
-  return res.json({ response });
+    const response = await callAgent(req.user.email, text.trim());
+    return res.json({ response });
+  } catch (error) {
+    console.error('[Agent Route Error]', error);
+    return res.json({ response: "I encountered an error while processing your request." });
+  }
 });
 
 module.exports = router;

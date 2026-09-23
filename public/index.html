@@ -49,6 +49,20 @@
                     </div>
                 </div>
 
+                <div class="tasks-panel card">
+                    <div class="tasks-header">
+                        <div class="tasks-header-left">
+                            <span class="tasks-icon">📋</span>
+                            <h3>Your Tasks</h3>
+                            <span id="tasks-count" class="tasks-badge">0</span>
+                        </div>
+                        <button id="refresh-tasks-btn" class="tasks-refresh-btn" type="button" title="Refresh tasks">↻ Refresh</button>
+                    </div>
+                    <ul id="tasks-list" class="tasks-list">
+                        <li class="tasks-empty">No tasks yet. Say "Add Buy groceries to my list" to get started!</li>
+                    </ul>
+                </div>
+
                 <form id="text-form" class="text-form">
                     <label class="text-label" for="text-input">Type a message if voice recognition is unavailable</label>
                     <div class="text-row">

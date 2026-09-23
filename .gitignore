@@ -8,7 +8,12 @@ data/*.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
+data/*.log
 dist/
 build/
 DEPLOY.md
 push_to_github.bat
+push_changes.bat
+powershell.bat
+powershell.cmd
